@@ -99,9 +99,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r"*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\."
     ).format(escape_markdown_v2(user.first_name))
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN_V2,
-                                    reply_markup=get_inline_keyboard(user_id=user.id))
+                                   reply_markup=get_inline_keyboard(user_id=user.id))
     await update.message.reply_text(r'🔽 *Главное меню*:', parse_mode=ParseMode.MARKDOWN_V2,
-                                    reply_markup=get_main_menu())
+                                   reply_markup=get_main_menu())
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик нажатий инлайн-кнопок меню."""
@@ -118,7 +118,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if groups:
             group_list = '\n'.join(f'🔹 {gid}' for gid in groups)
             await query.message.reply_text(r'📋 *Список групп*:\n{0}'.format(escape_markdown_v2(group_list)),
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+                                         parse_mode=ParseMode.MARKDOWN_V2)
         else:
             await query.message.reply_text(r'📭 *Список групп пуст\.*', parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -127,14 +127,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if users:
             user_list = '\n'.join(f'🔹 {uid}' for uid in users)
             await query.message.reply_text(r'👥 *Список пользователей*:\n{0}'.format(escape_markdown_v2(user_list)),
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+                                         parse_mode=ParseMode.MARKDOWN_V2)
         else:
             await query.message.reply_text(r'📭 *Список пользователей пуст\.*', parse_mode=ParseMode.MARKDOWN_V2)
 
     elif data == 'add_entity':
         if user_id != ADMIN_ID:
             await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+                                         parse_mode=ParseMode.MARKDOWN_V2)
             return
         await query.message.reply_text(
             r'➕ *Что добавить?*\n1️⃣ ID группы \(отрицательное число\)\n2️⃣ ID пользователя \(положительное число\)',
@@ -144,7 +144,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == 'remove_group':
         if user_id != ADMIN_ID:
             await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+                                         parse_mode=ParseMode.MARKDOWN_V2)
             return
         await query.message.reply_text(r'🗑 *Введите ID группы для удаления*:', parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'remove_group'
@@ -152,14 +152,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == 'remove_user':
         if user_id != ADMIN_ID:
             await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+                                         parse_mode=ParseMode.MARKDOWN_V2)
             return
         await query.message.reply_text(r'🗑 *Введите ID пользователя для удаления*:', parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'remove_user'
 
     elif data == 'refresh_menu':
         await query.message.reply_text(r'🔄 *Меню обновлено*:', parse_mode=ParseMode.MARKDOWN_V2,
-                                      reply_markup=get_inline_keyboard(user_id=user_id))
+                                     reply_markup=get_inline_keyboard(user_id=user_id))
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -373,12 +373,13 @@ async def main():
         application.add_handler(CallbackQueryHandler(button_callback))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
         application.add_error_handler(error_handler)
-        await application.initialize()  # Инициализация бота
-        await application.start()       # Запуск бота
-        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)  # Запуск поллинга
+        await application.initialize()
+        webhook_url = os.getenv("WEBHOOK_URL", f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook")
+        await application.bot.set_webhook(url=webhook_url)
+        await application.start()
         # Бесконечный цикл для удержания процесса
         while True:
-            await asyncio.sleep(3600)  # Спим 1 час, чтобы не нагружать CPU
+            await asyncio.sleep(3600)
     except Exception as e:
         logger.error(f"Ошибка инициализации бота: {e}", exc_info=e)
         if ADMIN_ID:
@@ -395,8 +396,8 @@ async def main():
         raise
     finally:
         if 'application' in locals():
-            await application.stop()      # Остановка бота
-            await application.shutdown()  # Завершение работы
+            await application.stop()
+            await application.shutdown()
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
