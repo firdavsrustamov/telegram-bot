@@ -169,7 +169,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text('❌ *ID должен быть числом.*', parse_mode='Markdown')
         return
 
-    # Рассылка сообщения в группы
     message_text = text
     groups = load_groups()
     success_count = 0
