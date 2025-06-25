@@ -1,4 +1,3 @@
-```python
 import asyncio
 import logging
 import json
@@ -23,7 +22,7 @@ logger = logging.getLogger(__name__)
 GROUPS_FILE = 'groups.json'
 USERS_FILE = 'users.json'
 
-def escape_markdown(text):
+def escape_markdown_v2(text):
     """Экранирование специальных символов для MarkdownV2."""
     chars = r'_*[]()~`>#+-=|{}.!'
     for char in chars:
@@ -39,13 +38,13 @@ def load_groups():
         return []
 
 def save_groups(groups):
-    """Сохранение списка ID групп в файл."""
+    """Сохранение списка ID групп в файл с блокировкой."""
     with FileLock(GROUPS_FILE + '.lock'):
         with open(GROUPS_FILE, 'w') as f:
             json.dump(groups, f)
 
 def load_users():
-    """Заголовка списка ID пользователей из файла с блокировкой."""
+    """Загрузка списка ID пользователей из файла с блокировкой."""
     with FileLock(USERS_FILE + '.lock'):
         if os.path.exists(USERS_FILE):
             with open(USERS_FILE, 'r') as f:
@@ -139,7 +138,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                           parse_mode=ParseMode.MARKDOWN_V2)
             return
         await query.message.reply_text(
-            r'➕ *Что добавить?*\n1️⃣ ID группы \(отрицательное число\)\n2️⃣ ID пользователя \(положительное число\)',
+            r'➕ *Что добавить?*\n1️⃣ ID группы $$ отрицательное число $$\n2️⃣ ID пользователя $$ положительное число $$',
             parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'add'
 
@@ -360,7 +359,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 chat_id=ADMIN_ID,
-                text=r'❌ Ошибка: `{0}`'.format(escape_markdown_v2(str(context.error))),
+                text=r'❌ *Ошибка бота:* `{0}`'.format(escape_markdown_v2(str(context.error))),
                 parse_mode=ParseMode.MARKDOWN_V2
             )
         except Exception as e:
@@ -382,13 +381,12 @@ async def main():
             try:
                 await application.bot.send_message(
                     chat_id=ADMIN_ID,
-                    text=r'❌ Бот не запустился: `{0}`'.format(escape_markdown_v2(str(e))),
+                    text=r'❌ *Бот не запустился:* `{0}`'.format(escape_markdown_v2(str(e))),
                     parse_mode=ParseMode.MARKDOWN_V2
                 )
             except Exception as notify_error:
-                logger.error(f"Не удалось отправить уведомления об ошибке администратору: {notify_error}")
+                logger.error(f"Не удалось отправить уведомление об ошибке администратору: {notify_error}")
         raise
 
 if __name__ == '__main__':
     asyncio.run(main())
-```
