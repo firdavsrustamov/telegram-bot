@@ -372,8 +372,13 @@ async def main():
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CallbackQueryHandler(button_callback))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-        application.add_error_handler(error_handler)  # Исправлено: add_error_handler вместо add_handler
-        await application.run_polling(allowed_updates=Update.ALL_TYPES)
+        application.add_error_handler(error_handler)
+        await application.initialize()  # Инициализация бота
+        await application.start()       # Запуск бота
+        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)  # Запуск поллинга
+        # Бесконечный цикл для удержания процесса
+        while True:
+            await asyncio.sleep(3600)  # Спим 1 час, чтобы не нагружать CPU
     except Exception as e:
         logger.error(f"Ошибка инициализации бота: {e}", exc_info=e)
         if ADMIN_ID:
@@ -388,6 +393,14 @@ async def main():
             except Exception as notify_error:
                 logger.error(f"Не удалось отправить уведомление об ошибке администратору: {notify_error}")
         raise
+    finally:
+        if 'application' in locals():
+            await application.stop()      # Остановка бота
+            await application.shutdown()  # Завершение работы
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(main())
+    finally:
+        loop.close()
