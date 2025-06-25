@@ -6,7 +6,6 @@ import sys
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.constants import ParseMode
-from telegram.error import Forbidden, BadRequest, NetworkError, RetryAfter
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from filelock import FileLock
 from config import TOKEN, ADMIN_ID
@@ -138,7 +137,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                           parse_mode=ParseMode.MARKDOWN_V2)
             return
         await query.message.reply_text(
-            r'➕ *Что добавить?*\n1️⃣ ID группы $$ отрицательное число $$\n2️⃣ ID пользователя $$ положительное число $$',
+            r'➕ *Что добавить?*\n1️⃣ ID группы \(отрицательное число\)\n2️⃣ ID пользователя \(положительное число\)',
             parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'add'
 
@@ -369,17 +368,20 @@ async def main():
     """Запуск бота."""
     try:
         logger.info(f"Starting bot with Python {sys.version}, python-telegram-bot {telegram.__version__}")
-        application = await Application.builder().token(TOKEN).build()
+        application = Application.builder().token(TOKEN).build()  # Убрали await, так как метод синхронный
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CallbackQueryHandler(button_callback))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-        application.add_error_handler(error_handler)
+        application.add_handler(error_handler)
         await application.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         logger.error(f"Ошибка инициализации бота: {e}", exc_info=e)
         if ADMIN_ID:
+            # Создаём временный бот для отправки уведомления
+            from telegram import Bot
             try:
-                await application.bot.send_message(
+                bot = Bot(token=TOKEN)
+                await bot.send_message(
                     chat_id=ADMIN_ID,
                     text=r'❌ *Бот не запустился:* `{0}`'.format(escape_markdown_v2(str(e))),
                     parse_mode=ParseMode.MARKDOWN_V2
