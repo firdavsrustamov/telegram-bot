@@ -368,16 +368,15 @@ async def main():
     """Запуск бота."""
     try:
         logger.info(f"Starting bot with Python {sys.version}, python-telegram-bot {telegram.__version__}")
-        application = Application.builder().token(TOKEN).build()  # Убрали await, так как метод синхронный
+        application = Application.builder().token(TOKEN).build()
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CallbackQueryHandler(button_callback))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-        application.add_handler(error_handler)
+        application.add_error_handler(error_handler)  # Исправлено: add_error_handler вместо add_handler
         await application.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         logger.error(f"Ошибка инициализации бота: {e}", exc_info=e)
         if ADMIN_ID:
-            # Создаём временный бот для отправки уведомления
             from telegram import Bot
             try:
                 bot = Bot(token=TOKEN)
