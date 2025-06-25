@@ -1,9 +1,12 @@
+```python
 import asyncio
 import logging
 import json
 import os
 import sys
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update, ParseMode
+import telegram
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.error import Forbidden, BadRequest, NetworkError, RetryAfter
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from filelock import FileLock
@@ -16,34 +19,34 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Пути к файлам с сохранёнными ID групп и пользователей
+# Пути к файлам
 GROUPS_FILE = 'groups.json'
 USERS_FILE = 'users.json'
 
-def escape_markdown_v2(text):
+def escape_markdown(text):
     """Экранирование специальных символов для MarkdownV2."""
-    chars = r'_[]()~`>#+-=|{}.!'
+    chars = r'_*[]()~`>#+-=|{}.!'
     for char in chars:
         text = text.replace(char, f'\\{char}')
     return text
 
 def load_groups():
     """Загрузка списка ID групп из файла с блокировкой."""
-    with FileLock(GROUPS_FILE + ".lock"):
+    with FileLock(GROUPS_FILE + '.lock'):
         if os.path.exists(GROUPS_FILE):
             with open(GROUPS_FILE, 'r') as f:
                 return json.load(f)
         return []
 
 def save_groups(groups):
-    """Сохранение списка ID групп в файл с блокировкой."""
-    with FileLock(GROUPS_FILE + ".lock"):
+    """Сохранение списка ID групп в файл."""
+    with FileLock(GROUPS_FILE + '.lock'):
         with open(GROUPS_FILE, 'w') as f:
             json.dump(groups, f)
 
 def load_users():
-    """Загрузка списка ID пользователей из файла с блокировкой."""
-    with FileLock(USERS_FILE + ".lock"):
+    """Заголовка списка ID пользователей из файла с блокировкой."""
+    with FileLock(USERS_FILE + '.lock'):
         if os.path.exists(USERS_FILE):
             with open(USERS_FILE, 'r') as f:
                 return json.load(f)
@@ -51,7 +54,7 @@ def load_users():
 
 def save_users(users):
     """Сохранение списка ID пользователей в файл с блокировкой."""
-    with FileLock(USERS_FILE + ".lock"):
+    with FileLock(USERS_FILE + '.lock'):
         with open(USERS_FILE, 'w') as f:
             json.dump(users, f)
 
@@ -93,13 +96,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     logger.info(f"Пользователь {user.id} запустил команду /start")
     welcome_text = (
-        f"*Привет, {escape_markdown_v2(user.first_name)}!* 🎉\n\n"
-        "Я бот для рассылки сообщений в группы Telegram\. Просто отправь мне текст, и я разошлю его по всем подключенным группам и пользователям\.\n\n"
-        "*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\."
-    )
+        r"*Привет, {0}!* 🎉\n\n"
+        r"Я бот для рассылки сообщений в группы Telegram\. Просто отправь мне текст, и я разошлю его по всем подключенным группам и пользователям\.\n\n"
+        r"*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\."
+    ).format(escape_markdown_v2(user.first_name))
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN_V2,
                                     reply_markup=get_inline_keyboard(user_id=user.id))
-    await update.message.reply_text('🔽 *Главное меню*:', parse_mode=ParseMode.MARKDOWN_V2,
+    await update.message.reply_text(r'🔽 *Главное меню*:', parse_mode=ParseMode.MARKDOWN_V2,
                                     reply_markup=get_main_menu())
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -116,48 +119,48 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         groups = load_groups()
         if groups:
             group_list = '\n'.join(f'🔹 {gid}' for gid in groups)
-            await query.message.reply_text(f'📋 *Список групп*:\n{escape_markdown_v2(group_list)}',
+            await query.message.reply_text(r'📋 *Список групп*:\n{0}'.format(escape_markdown_v2(group_list)),
                                           parse_mode=ParseMode.MARKDOWN_V2)
         else:
-            await query.message.reply_text('📭 *Список групп пуст\.*', parse_mode=ParseMode.MARKDOWN_V2)
+            await query.message.reply_text(r'📭 *Список групп пуст\.*', parse_mode=ParseMode.MARKDOWN_V2)
 
     elif data == 'list_users':
         users = load_users()
         if users:
             user_list = '\n'.join(f'🔹 {uid}' for uid in users)
-            await query.message.reply_text(f'👥 *Список пользователей*:\n{escape_markdown_v2(user_list)}',
+            await query.message.reply_text(r'👥 *Список пользователей*:\n{0}'.format(escape_markdown_v2(user_list)),
                                           parse_mode=ParseMode.MARKDOWN_V2)
         else:
-            await query.message.reply_text('📭 *Список пользователей пуст\.*', parse_mode=ParseMode.MARKDOWN_V2)
+            await query.message.reply_text(r'📭 *Список пользователей пуст\.*', parse_mode=ParseMode.MARKDOWN_V2)
 
     elif data == 'add_entity':
         if user_id != ADMIN_ID:
-            await query.message.reply_text('🚫 *Только администратор может выполнять эту команду\.*',
+            await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
                                           parse_mode=ParseMode.MARKDOWN_V2)
             return
         await query.message.reply_text(
-            '➕ *Что добавить?*\n1️⃣ ID группы \(отрицательное число\)\n2️⃣ ID пользователя \(положительное число\)',
+            r'➕ *Что добавить?*\n1️⃣ ID группы \(отрицательное число\)\n2️⃣ ID пользователя \(положительное число\)',
             parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'add'
 
     elif data == 'remove_group':
         if user_id != ADMIN_ID:
-            await query.message.reply_text('🚫 *Только администратор может выполнять эту команду\.*',
+            await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
                                           parse_mode=ParseMode.MARKDOWN_V2)
             return
-        await query.message.reply_text('🗑 *Введите ID группы для удаления*:', parse_mode=ParseMode.MARKDOWN_V2)
+        await query.message.reply_text(r'🗑 *Введите ID группы для удаления*:', parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'remove_group'
 
     elif data == 'remove_user':
         if user_id != ADMIN_ID:
-            await query.message.reply_text('🚫 *Только администратор может выполнять эту команду\.*',
+            await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
                                           parse_mode=ParseMode.MARKDOWN_V2)
             return
-        await query.message.reply_text('🗑 *Введите ID пользователя для удаления*:', parse_mode=ParseMode.MARKDOWN_V2)
+        await query.message.reply_text(r'🗑 *Введите ID пользователя для удаления*:', parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'remove_user'
 
     elif data == 'refresh_menu':
-        await query.message.reply_text('🔄 *Меню обновлено*:', parse_mode=ParseMode.MARKDOWN_V2,
+        await query.message.reply_text(r'🔄 *Меню обновлено*:', parse_mode=ParseMode.MARKDOWN_V2,
                                       reply_markup=get_inline_keyboard(user_id=user_id))
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -173,20 +176,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Получено сообщение от пользователя {user_id}: {text}")
 
     if text == '✨ Показать меню':
-        await update.message.reply_text('✨ *Меню*:', parse_mode=ParseMode.MARKDOWN_V2,
+        await update.message.reply_text(r'✨ *Меню*:', parse_mode=ParseMode.MARKDOWN_V2,
                                        reply_markup=get_inline_keyboard(user_id=user_id))
         return
 
     if context.user_data.get('awaiting_entity_id'):
         if user_id != ADMIN_ID:
-            await update.message.reply_text('🚫 *Только администратор может выполнять эту команду\.*',
+            await update.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
                                            parse_mode=ParseMode.MARKDOWN_V2)
             context.user_data.clear()
             return
         try:
             entity_id = int(text.strip())
         except ValueError:
-            await update.message.reply_text('❌ *ID должен быть числом\.*', parse_mode=ParseMode.MARKDOWN_V2)
+            await update.message.reply_text(r'❌ *ID должен быть числом\.*', parse_mode=ParseMode.MARKDOWN_V2)
             return
 
         action = context.user_data.get('awaiting_entity_id')
@@ -198,19 +201,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if entity_id not in groups:
                     groups.append(entity_id)
                     save_groups(groups)
-                    await update.message.reply_text(f'✅ *Группа {entity_id} добавлена\.*',
+                    await update.message.reply_text(r'✅ *Группа {0} добавлена\.*'.format(entity_id),
                                                   parse_mode=ParseMode.MARKDOWN_V2)
                 else:
-                    await update.message.reply_text(f'⚠️ *Группа {entity_id} уже есть в списке\.*',
+                    await update.message.reply_text(r'⚠️ *Группа {0} уже есть в списке\.*'.format(entity_id),
                                                   parse_mode=ParseMode.MARKDOWN_V2)
             else:
                 if entity_id not in users:
                     users.append(entity_id)
                     save_users(users)
-                    await update.message.reply_text(f'✅ *Пользователь {entity_id} добавлен\.*',
+                    await update.message.reply_text(r'✅ *Пользователь {0} добавлен\.*'.format(entity_id),
                                                   parse_mode=ParseMode.MARKDOWN_V2)
                 else:
-                    await update.message.reply_text(f'⚠️ *Пользователь {entity_id} уже есть в списке\.*',
+                    await update.message.reply_text(r'⚠️ *Пользователь {0} уже есть в списке\.*'.format(entity_id),
                                                   parse_mode=ParseMode.MARKDOWN_V2)
 
         elif action == 'remove_group':
@@ -218,10 +221,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if entity_id in groups:
                 groups.remove(entity_id)
                 save_groups(groups)
-                await update.message.reply_text(f'🗑 *Группа {entity_id} удалена из списка\.*',
+                await update.message.reply_text(r'🗑 *Группа {0} удалена из списка\.*'.format(entity_id),
                                               parse_mode=ParseMode.MARKDOWN_V2)
             else:
-                await update.message.reply_text(f'⚠️ *Группа {entity_id} не найдена в списке\.*',
+                await update.message.reply_text(r'⚠️ *Группа {0} не найдена в списке\.*'.format(entity_id),
                                               parse_mode=ParseMode.MARKDOWN_V2)
 
         elif action == 'remove_user':
@@ -229,19 +232,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if entity_id in users:
                 users.remove(entity_id)
                 save_users(users)
-                await update.message.reply_text(f'🗑 *Пользователь {entity_id} удалён из списка\.*',
+                await update.message.reply_text(r'🗑 *Пользователь {0} удалён из списка\.*'.format(entity_id),
                                               parse_mode=ParseMode.MARKDOWN_V2)
             else:
-                await update.message.reply_text(f'⚠️ *Пользователь {entity_id} не найден в списке\.*',
+                await update.message.reply_text(r'⚠️ *Пользователь {0} не найден в списке\.*'.format(entity_id),
                                               parse_mode=ParseMode.MARKDOWN_V2)
-        await update.message.reply_text('✨ *Меню*:', parse_mode=ParseMode.MARKDOWN_V2,
+        await update.message.reply_text(r'✨ *Меню*:', parse_mode=ParseMode.MARKDOWN_V2,
                                        reply_markup=get_inline_keyboard(user_id=user_id))
         return
 
     if user_id != ADMIN_ID:
         authorized_users = load_users()
         if user_id not in authorized_users:
-            await update.message.reply_text('🚫 *У вас нет прав на отправку рассылки\.*',
+            await update.message.reply_text(r'🚫 *У вас нет прав на отправку рассылки\.*',
                                            parse_mode=ParseMode.MARKDOWN_V2)
             return
 
@@ -255,7 +258,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except BadRequest as e:
         if "can't parse" in str(e).lower():
             await update.message.reply_text(
-                '❌ *Ошибка: некорректный Markdown\. Используйте корректную разметку или отправьте текст без форматирования\.*',
+                r'❌ *Ошибка: некорректный Markdown\. Используйте корректную разметку или отправьте текст без форматирования\.*',
                 parse_mode=ParseMode.MARKDOWN_V2
             )
             return
@@ -328,15 +331,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_users(users)
 
     response_lines = [
-        f'✅ *Сообщение отправлено в {success_groups} из {len(groups)} групп*\.',
-        f'✅ *Сообщение отправлено {success_users} из {len(users)} пользователей*\.'
+        r'✅ *Сообщение отправлено в {0} из {1} групп*\.'.format(success_groups, len(groups)),
+        r'✅ *Сообщение отправлено {0} из {1} пользователей*\.'.format(success_users, len(users))
     ]
     if groups_to_remove or users_to_remove:
         removed_info = ""
         if groups_to_remove:
-            removed_info += f"\n🗑 *Удалённые группы:* {', '.join(str(g) for g in groups_to_remove)}"
+            removed_info += r"\n🗑 *Удалённые группы:* {0}".format(', '.join(str(g) for g in groups_to_remove))
         if users_to_remove:
-            removed_info += f"\n🗑 *Удалённые пользователи:* {', '.join(str(u) for u in users_to_remove)}"
+            removed_info += r"\n🗑 *Удалённые пользователи:* {0}".format(', '.join(str(u) for u in users_to_remove))
         response_lines.append(escape_markdown_v2(removed_info))
 
     await update.message.reply_text(
@@ -350,20 +353,23 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Ошибка: {context.error}", exc_info=context.error)
     if update and hasattr(update, 'message') and update.message:
         await update.message.reply_text(
-            f'❌ *Ошибка:* `{escape_markdown_v2(str(context.error))}`',
+            r'❌ *Ошибка:* `{0}`'.format(escape_markdown_v2(str(context.error))),
             parse_mode=ParseMode.MARKDOWN_V2
         )
     if ADMIN_ID:
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=f'❌ *Ошибка бота:* `{escape_markdown_v2(str(context.error))}`',
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_ID,
+                text=r'❌ Ошибка: `{0}`'.format(escape_markdown_v2(str(context.error))),
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление об ошибке администратору: {e}")
 
 async def main():
     """Запуск бота."""
     try:
-        logger.info(f"Starting bot with Python {sys.version} and python-telegram-bot {telegram.__version__}")
+        logger.info(f"Starting bot with Python {sys.version}, python-telegram-bot {telegram.__version__}")
         application = await Application.builder().token(TOKEN).build()
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CallbackQueryHandler(button_callback))
@@ -371,14 +377,18 @@ async def main():
         application.add_error_handler(error_handler)
         await application.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
-        logger.error(f"Failed to start bot: {e}", exc_info=e)
+        logger.error(f"Ошибка инициализации бота: {e}", exc_info=e)
         if ADMIN_ID:
-            await application.bot.send_message(
-                chat_id=ADMIN_ID,
-                text=f'❌ *Бот не запустился:* `{escape_markdown_v2(str(e))}`',
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
+            try:
+                await application.bot.send_message(
+                    chat_id=ADMIN_ID,
+                    text=r'❌ Бот не запустился: `{0}`'.format(escape_markdown_v2(str(e))),
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+            except Exception as notify_error:
+                logger.error(f"Не удалось отправить уведомления об ошибке администратору: {notify_error}")
         raise
 
 if __name__ == '__main__':
     asyncio.run(main())
+```
