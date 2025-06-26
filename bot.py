@@ -8,6 +8,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from filelock import FileLock
+from aiohttp import web
 from config import TOKEN, ADMIN_ID
 
 # Настройка логирования
@@ -99,9 +100,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r"*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\."
     ).format(escape_markdown_v2(user.first_name))
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN_V2,
-                                   reply_markup=get_inline_keyboard(user_id=user.id))
+                                    reply_markup=get_inline_keyboard(user_id=user.id))
     await update.message.reply_text(r'🔽 *Главное меню*:', parse_mode=ParseMode.MARKDOWN_V2,
-                                   reply_markup=get_main_menu())
+                                    reply_markup=get_main_menu())
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик нажатий инлайн-кнопок меню."""
@@ -118,7 +119,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if groups:
             group_list = '\n'.join(f'🔹 {gid}' for gid in groups)
             await query.message.reply_text(r'📋 *Список групп*:\n{0}'.format(escape_markdown_v2(group_list)),
-                                         parse_mode=ParseMode.MARKDOWN_V2)
+                                          parse_mode=ParseMode.MARKDOWN_V2)
         else:
             await query.message.reply_text(r'📭 *Список групп пуст\.*', parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -127,14 +128,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if users:
             user_list = '\n'.join(f'🔹 {uid}' for uid in users)
             await query.message.reply_text(r'👥 *Список пользователей*:\n{0}'.format(escape_markdown_v2(user_list)),
-                                         parse_mode=ParseMode.MARKDOWN_V2)
+                                          parse_mode=ParseMode.MARKDOWN_V2)
         else:
             await query.message.reply_text(r'📭 *Список пользователей пуст\.*', parse_mode=ParseMode.MARKDOWN_V2)
 
     elif data == 'add_entity':
         if user_id != ADMIN_ID:
             await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
-                                         parse_mode=ParseMode.MARKDOWN_V2)
+                                          parse_mode=ParseMode.MARKDOWN_V2)
             return
         await query.message.reply_text(
             r'➕ *Что добавить?*\n1️⃣ ID группы \(отрицательное число\)\n2️⃣ ID пользователя \(положительное число\)',
@@ -144,7 +145,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == 'remove_group':
         if user_id != ADMIN_ID:
             await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
-                                         parse_mode=ParseMode.MARKDOWN_V2)
+                                          parse_mode=ParseMode.MARKDOWN_V2)
             return
         await query.message.reply_text(r'🗑 *Введите ID группы для удаления*:', parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'remove_group'
@@ -152,14 +153,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == 'remove_user':
         if user_id != ADMIN_ID:
             await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
-                                         parse_mode=ParseMode.MARKDOWN_V2)
+                                          parse_mode=ParseMode.MARKDOWN_V2)
             return
         await query.message.reply_text(r'🗑 *Введите ID пользователя для удаления*:', parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'remove_user'
 
     elif data == 'refresh_menu':
         await query.message.reply_text(r'🔄 *Меню обновлено*:', parse_mode=ParseMode.MARKDOWN_V2,
-                                     reply_markup=get_inline_keyboard(user_id=user_id))
+                                      reply_markup=get_inline_keyboard(user_id=user_id))
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -253,7 +254,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=message_text,
             parse_mode=ParseMode.MARKDOWN_V2
         )
-    except BadRequest as e:
+    except telegram.error.BadRequest as e:
         if "can't parse" in str(e).lower():
             await update.message.reply_text(
                 r'❌ *Ошибка: некорректный Markdown\. Используйте корректную разметку или отправьте текст без форматирования\.*',
@@ -275,21 +276,21 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             success_groups += 1
             logger.info(f"Сообщение отправлено в группу {group_id}")
             await asyncio.sleep(0.1)
-        except Forbidden:
+        except telegram.error.Forbidden:
             logger.warning(f"Недостаточно прав для отправки в группу {group_id}")
             groups_to_remove.append(group_id)
-        except BadRequest as e:
+        except telegram.error.BadRequest as e:
             if "chat not found" in str(e).lower():
                 logger.warning(f"Группа {group_id} недоступна")
                 groups_to_remove.append(group_id)
             else:
                 logger.error(f"Ошибка разметки в группе {group_id}: {e}")
-        except RetryAfter as e:
+        except telegram.error.RetryAfter as e:
             logger.warning(f"Лимит Telegram API для группы {group_id}, ждём {e.retry_after} секунд")
             await asyncio.sleep(e.retry_after)
             await context.bot.send_message(chat_id=group_id, text=message_text, parse_mode=ParseMode.MARKDOWN_V2)
             success_groups += 1
-        except NetworkError as e:
+        except telegram.error.NetworkError as e:
             logger.error(f"Сетевая ошибка при отправке в группу {group_id}: {e}")
         except Exception as e:
             logger.error(f"Неизвестная ошибка при отправке в группу {group_id}: {e}")
@@ -300,21 +301,21 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             success_users += 1
             logger.info(f"Сообщение отправлено пользователю {user}")
             await asyncio.sleep(0.1)
-        except Forbidden:
+        except telegram.error.Forbidden:
             logger.warning(f"Не удалось отправить пользователю {user}")
             users_to_remove.append(user)
-        except BadRequest as e:
+        except telegram.error.BadRequest as e:
             if "chat not found" in str(e).lower():
                 logger.warning(f"Пользователь {user} недоступен")
                 users_to_remove.append(user)
             else:
                 logger.error(f"Ошибка разметки для пользователя {user}: {e}")
-        except RetryAfter as e:
+        except telegram.error.RetryAfter as e:
             logger.warning(f"Лимит Telegram API для пользователя {user}, ждём {e.retry_after} секунд")
             await asyncio.sleep(e.retry_after)
             await context.bot.send_message(chat_id=user, text=message_text, parse_mode=ParseMode.MARKDOWN_V2)
             success_users += 1
-        except NetworkError as e:
+        except telegram.error.NetworkError as e:
             logger.error(f"Сетевая ошибка при отправке пользователю {user}: {e}")
         except Exception as e:
             logger.error(f"Неизвестная ошибка при отправке пользователю {user}: {e}")
@@ -364,6 +365,17 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Не удалось отправить уведомление об ошибке администратору: {e}")
 
+async def webhook_handler(request, application):
+    """Обработчик Webhook-запросов."""
+    try:
+        update = Update.de_json(await request.json(), application.bot)
+        if update:
+            await application.process_update(update)
+        return web.Response(status=200)
+    except Exception as e:
+        logger.error(f"Ошибка обработки Webhook: {e}", exc_info=e)
+        return web.Response(status=500)
+
 async def main():
     """Запуск бота."""
     try:
@@ -374,8 +386,22 @@ async def main():
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
         application.add_error_handler(error_handler)
         await application.initialize()
+        
+        # Настройка Webhook
         webhook_url = os.getenv("WEBHOOK_URL", f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook")
+        logger.info(f"Setting webhook: {webhook_url}")
         await application.bot.set_webhook(url=webhook_url)
+        
+        # Запуск HTTP-сервера
+        app = web.Application()
+        app.router.add_post('/webhook', lambda request: webhook_handler(request, application))
+        runner = web.AppRunner(app)
+        await runner.setup()
+        port = int(os.getenv("PORT", 10000))  # Render задаёт PORT, по умолчанию 10000
+        site = web.TCPSite(runner, '0.0.0.0', port)
+        await site.start()
+        logger.info(f"HTTP server started on port {port}")
+
         await application.start()
         # Бесконечный цикл для удержания процесса
         while True:
@@ -400,8 +426,10 @@ async def main():
             await application.shutdown()
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(main())
     finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
