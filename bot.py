@@ -26,7 +26,7 @@ def escape_markdown_v2(text):
     """Экранирование специальных символов для MarkdownV2."""
     if not isinstance(text, str):
         text = str(text)
-    chars = r'_*[]()~`>#+-=|{}.!'
+    chars = r'_*[]()~`>#+-=|{}.!,:'
     for char in chars:
         text = text.replace(char, f'\\{char}')
     return text
@@ -103,7 +103,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     logger.info(f"Пользователь {user.id} запустил команду /start")
     welcome_text = (
-        f"*Привет\\, {escape_markdown_v2(user.first_name)}\\!* 🎉\n\n"
+        f"*Привет\\, {escape_markdown_v2(user.first_name)}\\!*\n\n"
         f"Я бот для рассылки сообщений\\, стикеров\\, фото и видео в группы Telegram\\. "
         f"Отправь мне текст или медиа\\, и я разошлю их по всем подключенным группам\\.\n\n"
         f"*Меню\\:* Вы можете посмотреть список групп или пользователей\\, а администратор – управлять ими\\."
@@ -258,7 +258,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
         # Обработка текста
-        content = escape_markdown_v2(text) if any(c in text for c in r'_*[]()~`>#+-=|{}.!') else text
+        content = escape_markdown_v2(text) if any(c in text for c in r'_*[]()~`>#+-=|{}.!,:') else text
     else:
         # Обработка медиа (фото, видео, стикеры)
         if update.message.photo:
