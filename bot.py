@@ -63,6 +63,7 @@ def get_inline_keyboard(user_id=None):
     """
     Формирование инлайн-клавиатуры меню.
     Если user_id соответствует ADMIN_ID, включаются кнопки администрирования.
+    Кнопки расположены в 3 строки по 2.
     """
     keyboard = [
         [
@@ -74,15 +75,20 @@ def get_inline_keyboard(user_id=None):
         ]
     ]
     if ADMIN_ID and user_id == ADMIN_ID:
-        keyboard.extend([
+        keyboard = [
             [
-                InlineKeyboardButton("➕ Добавить группу/пользователя", callback_data='add_entity'),
+                InlineKeyboardButton("📋 Список групп", callback_data='list_groups'),
+                InlineKeyboardButton("👥 Список пользователей", callback_data='list_users')
+            ],
+            [
+                InlineKeyboardButton("➕ Добавить", callback_data='add_entity'),
                 InlineKeyboardButton("🗑 Удалить группу", callback_data='remove_group')
             ],
             [
-                InlineKeyboardButton("🗑 Удалить пользователя", callback_data='remove_user')
+                InlineKeyboardButton("🗑 Удалить пользователя", callback_data='remove_user'),
+                InlineKeyboardButton("🔄 Обновить меню", callback_data='refresh_menu')
             ]
-        ])
+        ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_main_menu():
@@ -98,7 +104,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Пользователь {user.id} запустил команду /start")
     welcome_text = (
         r"*Привет, {0}\!* 🎉\n\n"
-        r"Я бот для рассылки сообщений в группы Telegram\. Просто отправь мне текст, и я разошлю его по всем подключенным группам и пользователям\.\n\n"
+        r"Я бот для рассылки сообщений в группы Telegram\. Просто отправь мне текст, и я разошлю его по всем подключенным группам\.\n\n"
         r"*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\."
     ).format(escape_markdown_v2(user.first_name))
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN_V2,
@@ -249,21 +255,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                            parse_mode=ParseMode.MARKDOWN_V2)
             return
 
-    message_text = escape_markdown_v2(text)
+    # Экранирование специальных символов, если они есть
+    message_text = escape_markdown_v2(text) if any(c in text for c in r'_*[]()~`>#+-=|{}.!') else text
     try:
         await context.bot.send_message(
             chat_id=user_id,
-            text=message_text,
+            text=message_text
+        )  # Без форматирования
+    except telegram.error.BadRequest as e:
+        await update.message.reply_text(
+            r'❌ *Ошибка: не удалось отправить сообщение\.*',
             parse_mode=ParseMode.MARKDOWN_V2
         )
-    except telegram.error.BadRequest as e:
-        if "can't parse" in str(e).lower():
-            await update.message.reply_text(
-                r'❌ *Ошибка: некорректный Markdown\. Используйте корректную разметку или отправьте текст без форматирования\.*',
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-            return
-        raise
+        return
 
     groups = load_groups()
     users = load_users()
@@ -274,10 +278,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for group_id in groups:
         try:
-            await context.bot.send_message(chat_id=group_id, text=message_text, parse_mode=ParseMode.MARKDOWN_V2)
+            await context.bot.send_message(chat_id=group_id, text=message_text)  # Без форматирования
             success_groups += 1
             logger.info(f"Сообщение отправлено в группу {group_id}")
-            await asyncio.sleep(0.3)  # Увеличена задержка для избежания лимитов
+            await asyncio.sleep(0.3)
         except telegram.error.Forbidden:
             logger.warning(f"Недостаточно прав для отправки в группу {group_id}")
             groups_to_remove.append(group_id)
@@ -286,11 +290,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.warning(f"Группа {group_id} недоступна")
                 groups_to_remove.append(group_id)
             else:
-                logger.error(f"Ошибка разметки в группе {group_id}: {e}")
+                logger.error(f"Ошибка отправки в группу {group_id}: {e}")
         except telegram.error.RetryAfter as e:
             logger.warning(f"Лимит Telegram API для группы {group_id}, ждём {e.retry_after} секунд")
             await asyncio.sleep(e.retry_after)
-            await context.bot.send_message(chat_id=group_id, text=message_text, parse_mode=ParseMode.MARKDOWN_V2)
+            await context.bot.send_message(chat_id=group_id, text=message_text)
             success_groups += 1
         except telegram.error.NetworkError as e:
             logger.error(f"Сетевая ошибка при отправке в группу {group_id}: {e}")
@@ -299,10 +303,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for user in users:
         try:
-            await context.bot.send_message(chat_id=user, text=message_text, parse_mode=ParseMode.MARKDOWN_V2)
+            await context.bot.send_message(chat_id=user, text=message_text)  # Без форматирования
             success_users += 1
             logger.info(f"Сообщение отправлено пользователю {user}")
-            await asyncio.sleep(0.3)  # Увеличена задержка
+            await asyncio.sleep(0.3)
         except telegram.error.Forbidden:
             logger.warning(f"Не удалось отправить пользователю {user}")
             users_to_remove.append(user)
@@ -311,11 +315,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.warning(f"Пользователь {user} недоступен")
                 users_to_remove.append(user)
             else:
-                logger.error(f"Ошибка разметки для пользователя {user}: {e}")
+                logger.error(f"Ошибка отправки пользователю {user}: {e}")
         except telegram.error.RetryAfter as e:
             logger.warning(f"Лимит Telegram API для пользователя {user}, ждём {e.retry_after} секунд")
             await asyncio.sleep(e.retry_after)
-            await context.bot.send_message(chat_id=user, text=message_text, parse_mode=ParseMode.MARKDOWN_V2)
+            await context.bot.send_message(chat_id=user, text=message_text)
             success_users += 1
         except telegram.error.NetworkError as e:
             logger.error(f"Сетевая ошибка при отправке пользователю {user}: {e}")
@@ -331,17 +335,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             users.remove(user)
         save_users(users)
 
+    # Отображаем только информацию о группах
     response_lines = [
-        r'✅ *Сообщение отправлено в {0} из {1} групп*\.'.format(success_groups, len(groups)),
-        r'✅ *Сообщение отправлено {0} из {1} пользователей*\.'.format(success_users, len(users))
+        r'✅ *Сообщение отправлено в {0} из {1} групп*\.'.format(success_groups, len(groups))
     ]
-    if groups_to_remove or users_to_remove:
-        removed_info = ""
-        if groups_to_remove:
-            removed_info += r"\n🗑 *Удалённые группы:* {0}".format(', '.join(str(g) for g in groups_to_remove))
-        if users_to_remove:
-            removed_info += r"\n🗑 *Удалённые пользователи:* {0}".format(', '.join(str(u) for u in users_to_remove))
-        response_lines.append(escape_markdown_v2(removed_info))
 
     await update.message.reply_text(
         "\n".join(response_lines),
