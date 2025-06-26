@@ -324,9 +324,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             groups.remove(group_id)
         save_groups(groups)
 
-    # Отображаем только информацию о группах
+    # Экранируем шаблон ответа
+    response_template = escape_markdown_v2(r'✅ *Сообщение отправлено в {0} из {1} групп\\.*')
     response_lines = [
-        r'✅ *Сообщение отправлено в {0} из {1} групп\\.*'.format(success_groups, len(groups))
+        response_template.format(success_groups, len(groups))
     ]
 
     await update.message.reply_text(
