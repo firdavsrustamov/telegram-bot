@@ -146,9 +146,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\\.*',
                                           parse_mode=ParseMode.MARKDOWN_V2)
             return
-        await query.message.reply_text(
-            r'➕ *Что добавить\\?*\n1️⃣ ID группы \\(отрицательное число\\)\n2️⃣ ID пользователя \\(положительное число\\)',
-            parse_mode=ParseMode.MARKDOWN_V2)
+        add_text = r'➕ *Что добавить\\?*\n1️⃣ ID группы \\(отрицательное число\\)\n2️⃣ ID пользователя \\(положительное число\\)'
+        await query.message.reply_text(escape_markdown_v2(add_text),
+                                      parse_mode=ParseMode.MARKDOWN_V2)
         context.user_data['awaiting_entity_id'] = 'add'
 
     elif data == 'remove_group':
