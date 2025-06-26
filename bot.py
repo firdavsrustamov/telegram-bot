@@ -103,10 +103,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     logger.info(f"Пользователь {user.id} запустил команду /start")
     welcome_text = (
-        r"*Привет, {0}\!* 🎉\n\n"
-        r"Я бот для рассылки сообщений, стикеров, фото и видео в группы Telegram\. Отправь мне текст или медиа, и я разошлю их по всем подключенным группам\.\n\n"
-        r"*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\."
-    ).format(escape_markdown_v2(user.first_name))
+        f"*Привет, {escape_markdown_v2(user.first_name)}!* 🎉\n\n"
+        f"Я бот для рассылки сообщений, стикеров, фото и видео в группы Telegram. "
+        f"Отправь мне текст или медиа, и я разошлю их по всем подключенным группам.\n\n"
+        f"*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими."
+    )
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN_V2,
                                     reply_markup=get_inline_keyboard(user_id=user.id))
     await update.message.reply_text(r'🔽 *Главное меню*:', parse_mode=ParseMode.MARKDOWN_V2,
@@ -257,8 +258,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
         # Обработка текста
-        message_text = escape_markdown_v2(text) if any(c in text for c in r'_*[]()~`>#+-=|{}.!') else text
-        content = message_text
+        content = escape_markdown_v2(text) if any(c in text for c in r'_*[]()~`>#+-=|{}.!') else text
     else:
         # Обработка медиа (фото, видео, стикеры)
         if update.message.photo:
@@ -274,23 +274,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(r'❌ *Поддерживаются только текст, фото, видео и стикеры\.*',
                                            parse_mode=ParseMode.MARKDOWN_V2)
             return
-
-    try:
-        # Отправка пользователю для подтверждения
-        if isinstance(content, str):
-            await context.bot.send_message(chat_id=user_id, text=content)
-        elif isinstance(content, telegram.PhotoSize):
-            await context.bot.send_photo(chat_id=user_id, photo=content.file_id)
-        elif isinstance(content, telegram.Video):
-            await context.bot.send_video(chat_id=user_id, video=content.file_id)
-        elif isinstance(content, telegram.Sticker):
-            await context.bot.send_sticker(chat_id=user_id, sticker=content.file_id)
-    except telegram.error.BadRequest as e:
-        await update.message.reply_text(
-            r'❌ *Ошибка: не удалось отправить вам копию\.*',
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-        return
 
     groups = load_groups()
     users = load_users()
