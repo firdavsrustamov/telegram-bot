@@ -104,7 +104,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Пользователь {user.id} запустил команду /start")
     welcome_text = (
         r"*Привет, {0}\!* 🎉\n\n"
-        r"Я бот для рассылки сообщений в группы Telegram\. Просто отправь мне текст, и я разошлю его по всем подключенным группам\.\n\n"
+        r"Я бот для рассылки сообщений, стикеров, фото и видео в группы Telegram\. Отправь мне текст или медиа, и я разошлю их по всем подключенным группам\.\n\n"
         r"*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\."
     ).format(escape_markdown_v2(user.first_name))
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN_V2,
@@ -172,99 +172,122 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Обработчик текстовых сообщений в личном чате.
+    Обработчик текстовых сообщений и медиа в личном чате.
     - Если ожидается ввод ID, обрабатывает его.
-    - Иначе воспринимает текст как сообщение для рассылки.
+    - Иначе воспринимает текст или медиа как сообщение для рассылки.
     """
     if not update.message or update.message.chat.type != 'private':
         return
     user_id = update.message.from_user.id
-    text = update.message.text
-    logger.info(f"Получено сообщение от пользователя {user_id}: {text}")
+    logger.info(f"Получено сообщение от пользователя {user_id}")
 
-    if text == '✨ Показать меню':
-        await update.message.reply_text(r'✨ *Меню*:', parse_mode=ParseMode.MARKDOWN_V2,
-                                       reply_markup=get_inline_keyboard(user_id=user_id))
-        return
+    if text := update.message.text:
+        logger.info(f"Текст: {text}")
+        if text == '✨ Показать меню':
+            await update.message.reply_text(r'✨ *Меню*:', parse_mode=ParseMode.MARKDOWN_V2,
+                                           reply_markup=get_inline_keyboard(user_id=user_id))
+            return
 
-    if context.user_data.get('awaiting_entity_id'):
-        if user_id != ADMIN_ID:
-            await update.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
-                                           parse_mode=ParseMode.MARKDOWN_V2)
+        if context.user_data.get('awaiting_entity_id'):
+            if user_id != ADMIN_ID:
+                await update.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\.*',
+                                               parse_mode=ParseMode.MARKDOWN_V2)
+                context.user_data.clear()
+                return
+            try:
+                entity_id = int(text.strip())
+            except ValueError:
+                await update.message.reply_text(r'❌ *ID должен быть числом\.*', parse_mode=ParseMode.MARKDOWN_V2)
+                return
+
+            action = context.user_data.get('awaiting_entity_id')
             context.user_data.clear()
-            return
-        try:
-            entity_id = int(text.strip())
-        except ValueError:
-            await update.message.reply_text(r'❌ *ID должен быть числом\.*', parse_mode=ParseMode.MARKDOWN_V2)
-            return
+            if action == 'add':
+                groups = load_groups()
+                users = load_users()
+                if entity_id < 0:
+                    if entity_id not in groups:
+                        groups.append(entity_id)
+                        save_groups(groups)
+                        await update.message.reply_text(r'✅ *Группа {0} добавлена\.*'.format(entity_id),
+                                                       parse_mode=ParseMode.MARKDOWN_V2)
+                    else:
+                        await update.message.reply_text(r'⚠️ *Группа {0} уже есть в списке\.*'.format(entity_id),
+                                                       parse_mode=ParseMode.MARKDOWN_V2)
+                else:
+                    if entity_id not in users:
+                        users.append(entity_id)
+                        save_users(users)
+                        await update.message.reply_text(r'✅ *Пользователь {0} добавлен\.*'.format(entity_id),
+                                                       parse_mode=ParseMode.MARKDOWN_V2)
+                    else:
+                        await update.message.reply_text(r'⚠️ *Пользователь {0} уже есть в списке\.*'.format(entity_id),
+                                                       parse_mode=ParseMode.MARKDOWN_V2)
 
-        action = context.user_data.get('awaiting_entity_id')
-        context.user_data.clear()
-        if action == 'add':
-            groups = load_groups()
-            users = load_users()
-            if entity_id < 0:
-                if entity_id not in groups:
-                    groups.append(entity_id)
+            elif action == 'remove_group':
+                groups = load_groups()
+                if entity_id in groups:
+                    groups.remove(entity_id)
                     save_groups(groups)
-                    await update.message.reply_text(r'✅ *Группа {0} добавлена\.*'.format(entity_id),
-                                                  parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_text(r'🗑 *Группа {0} удалена из списка\.*'.format(entity_id),
+                                                   parse_mode=ParseMode.MARKDOWN_V2)
                 else:
-                    await update.message.reply_text(r'⚠️ *Группа {0} уже есть в списке\.*'.format(entity_id),
-                                                  parse_mode=ParseMode.MARKDOWN_V2)
-            else:
-                if entity_id not in users:
-                    users.append(entity_id)
+                    await update.message.reply_text(r'⚠️ *Группа {0} не найдена в списке\.*'.format(entity_id),
+                                                   parse_mode=ParseMode.MARKDOWN_V2)
+
+            elif action == 'remove_user':
+                users = load_users()
+                if entity_id in users:
+                    users.remove(entity_id)
                     save_users(users)
-                    await update.message.reply_text(r'✅ *Пользователь {0} добавлен\.*'.format(entity_id),
-                                                  parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_text(r'🗑 *Пользователь {0} удалён из списка\.*'.format(entity_id),
+                                                   parse_mode=ParseMode.MARKDOWN_V2)
                 else:
-                    await update.message.reply_text(r'⚠️ *Пользователь {0} уже есть в списке\.*'.format(entity_id),
-                                                  parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_text(r'⚠️ *Пользователь {0} не найден в списке\.*'.format(entity_id),
+                                                   parse_mode=ParseMode.MARKDOWN_V2)
+            await update.message.reply_text(r'✨ *Меню*:', parse_mode=ParseMode.MARKDOWN_V2,
+                                           reply_markup=get_inline_keyboard(user_id=user_id))
+            return
 
-        elif action == 'remove_group':
-            groups = load_groups()
-            if entity_id in groups:
-                groups.remove(entity_id)
-                save_groups(groups)
-                await update.message.reply_text(r'🗑 *Группа {0} удалена из списка\.*'.format(entity_id),
-                                              parse_mode=ParseMode.MARKDOWN_V2)
-            else:
-                await update.message.reply_text(r'⚠️ *Группа {0} не найдена в списке\.*'.format(entity_id),
-                                              parse_mode=ParseMode.MARKDOWN_V2)
+        if user_id != ADMIN_ID:
+            authorized_users = load_users()
+            if user_id not in authorized_users:
+                await update.message.reply_text(r'🚫 *У вас нет прав на отправку рассылки\.*',
+                                               parse_mode=ParseMode.MARKDOWN_V2)
+                return
 
-        elif action == 'remove_user':
-            users = load_users()
-            if entity_id in users:
-                users.remove(entity_id)
-                save_users(users)
-                await update.message.reply_text(r'🗑 *Пользователь {0} удалён из списка\.*'.format(entity_id),
-                                              parse_mode=ParseMode.MARKDOWN_V2)
-            else:
-                await update.message.reply_text(r'⚠️ *Пользователь {0} не найден в списке\.*'.format(entity_id),
-                                              parse_mode=ParseMode.MARKDOWN_V2)
-        await update.message.reply_text(r'✨ *Меню*:', parse_mode=ParseMode.MARKDOWN_V2,
-                                       reply_markup=get_inline_keyboard(user_id=user_id))
-        return
-
-    if user_id != ADMIN_ID:
-        authorized_users = load_users()
-        if user_id not in authorized_users:
-            await update.message.reply_text(r'🚫 *У вас нет прав на отправку рассылки\.*',
+        # Обработка текста
+        message_text = escape_markdown_v2(text) if any(c in text for c in r'_*[]()~`>#+-=|{}.!') else text
+        content = message_text
+    else:
+        # Обработка медиа (фото, видео, стикеры)
+        if update.message.photo:
+            logger.info(f"Фото от пользователя {user_id}")
+            content = update.message.photo[-1]  # Берем фото с наилучшим качеством
+        elif update.message.video:
+            logger.info(f"Видео от пользователя {user_id}")
+            content = update.message.video
+        elif update.message.sticker:
+            logger.info(f"Стикер от пользователя {user_id}")
+            content = update.message.sticker
+        else:
+            await update.message.reply_text(r'❌ *Поддерживаются только текст, фото, видео и стикеры\.*',
                                            parse_mode=ParseMode.MARKDOWN_V2)
             return
 
-    # Экранирование специальных символов, если они есть
-    message_text = escape_markdown_v2(text) if any(c in text for c in r'_*[]()~`>#+-=|{}.!') else text
     try:
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=message_text
-        )  # Без форматирования
+        # Отправка пользователю для подтверждения
+        if isinstance(content, str):
+            await context.bot.send_message(chat_id=user_id, text=content)
+        elif isinstance(content, telegram.PhotoSize):
+            await context.bot.send_photo(chat_id=user_id, photo=content.file_id)
+        elif isinstance(content, telegram.Video):
+            await context.bot.send_video(chat_id=user_id, video=content.file_id)
+        elif isinstance(content, telegram.Sticker):
+            await context.bot.send_sticker(chat_id=user_id, sticker=content.file_id)
     except telegram.error.BadRequest as e:
         await update.message.reply_text(
-            r'❌ *Ошибка: не удалось отправить сообщение\.*',
+            r'❌ *Ошибка: не удалось отправить вам копию\.*',
             parse_mode=ParseMode.MARKDOWN_V2
         )
         return
@@ -272,15 +295,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     groups = load_groups()
     users = load_users()
     success_groups = 0
-    success_users = 0
     groups_to_remove = []
-    users_to_remove = []
 
     for group_id in groups:
         try:
-            await context.bot.send_message(chat_id=group_id, text=message_text)  # Без форматирования
+            if isinstance(content, str):
+                await context.bot.send_message(chat_id=group_id, text=content)
+            elif isinstance(content, telegram.PhotoSize):
+                await context.bot.send_photo(chat_id=group_id, photo=content.file_id)
+            elif isinstance(content, telegram.Video):
+                await context.bot.send_video(chat_id=group_id, video=content.file_id)
+            elif isinstance(content, telegram.Sticker):
+                await context.bot.send_sticker(chat_id=group_id, sticker=content.file_id)
             success_groups += 1
-            logger.info(f"Сообщение отправлено в группу {group_id}")
+            logger.info(f"Контент отправлен в группу {group_id}")
             await asyncio.sleep(0.3)
         except telegram.error.Forbidden:
             logger.warning(f"Недостаточно прав для отправки в группу {group_id}")
@@ -294,46 +322,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except telegram.error.RetryAfter as e:
             logger.warning(f"Лимит Telegram API для группы {group_id}, ждём {e.retry_after} секунд")
             await asyncio.sleep(e.retry_after)
-            await context.bot.send_message(chat_id=group_id, text=message_text)
+            if isinstance(content, str):
+                await context.bot.send_message(chat_id=group_id, text=content)
+            elif isinstance(content, telegram.PhotoSize):
+                await context.bot.send_photo(chat_id=group_id, photo=content.file_id)
+            elif isinstance(content, telegram.Video):
+                await context.bot.send_video(chat_id=group_id, video=content.file_id)
+            elif isinstance(content, telegram.Sticker):
+                await context.bot.send_sticker(chat_id=group_id, sticker=content.file_id)
             success_groups += 1
         except telegram.error.NetworkError as e:
             logger.error(f"Сетевая ошибка при отправке в группу {group_id}: {e}")
         except Exception as e:
             logger.error(f"Неизвестная ошибка при отправке в группу {group_id}: {e}")
 
-    for user in users:
-        try:
-            await context.bot.send_message(chat_id=user, text=message_text)  # Без форматирования
-            success_users += 1
-            logger.info(f"Сообщение отправлено пользователю {user}")
-            await asyncio.sleep(0.3)
-        except telegram.error.Forbidden:
-            logger.warning(f"Не удалось отправить пользователю {user}")
-            users_to_remove.append(user)
-        except telegram.error.BadRequest as e:
-            if "chat not found" in str(e).lower():
-                logger.warning(f"Пользователь {user} недоступен")
-                users_to_remove.append(user)
-            else:
-                logger.error(f"Ошибка отправки пользователю {user}: {e}")
-        except telegram.error.RetryAfter as e:
-            logger.warning(f"Лимит Telegram API для пользователя {user}, ждём {e.retry_after} секунд")
-            await asyncio.sleep(e.retry_after)
-            await context.bot.send_message(chat_id=user, text=message_text)
-            success_users += 1
-        except telegram.error.NetworkError as e:
-            logger.error(f"Сетевая ошибка при отправке пользователю {user}: {e}")
-        except Exception as e:
-            logger.error(f"Неизвестная ошибка при отправке пользователю {user}: {e}")
-
     if groups_to_remove:
         for group_id in groups_to_remove:
             groups.remove(group_id)
         save_groups(groups)
-    if users_to_remove:
-        for user in users_to_remove:
-            users.remove(user)
-        save_users(users)
 
     # Отображаем только информацию о группах
     response_lines = [
@@ -384,7 +390,7 @@ async def main():
         application = Application.builder().token(TOKEN).build()
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CallbackQueryHandler(button_callback))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+        application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_text))  # Обработка всех типов сообщений
         application.add_error_handler(error_handler)
         await application.initialize()
         
