@@ -24,6 +24,8 @@ USERS_FILE = 'users.json'
 
 def escape_markdown_v2(text):
     """Экранирование специальных символов для MarkdownV2."""
+    if not isinstance(text, str):
+        text = str(text)
     chars = r'_*[]()~`>#+-=|{}.!'
     for char in chars:
         text = text.replace(char, f'\\{char}')
@@ -95,7 +97,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     logger.info(f"Пользователь {user.id} запустил команду /start")
     welcome_text = (
-        r"*Привет, {0}!* 🎉\n\n"
+        r"*Привет, {0}\!* 🎉\n\n"
         r"Я бот для рассылки сообщений в группы Telegram\. Просто отправь мне текст, и я разошлю его по всем подключенным группам и пользователям\.\n\n"
         r"*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\."
     ).format(escape_markdown_v2(user.first_name))
@@ -275,7 +277,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=group_id, text=message_text, parse_mode=ParseMode.MARKDOWN_V2)
             success_groups += 1
             logger.info(f"Сообщение отправлено в группу {group_id}")
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)  # Увеличена задержка для избежания лимитов
         except telegram.error.Forbidden:
             logger.warning(f"Недостаточно прав для отправки в группу {group_id}")
             groups_to_remove.append(group_id)
@@ -300,7 +302,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=user, text=message_text, parse_mode=ParseMode.MARKDOWN_V2)
             success_users += 1
             logger.info(f"Сообщение отправлено пользователю {user}")
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)  # Увеличена задержка
         except telegram.error.Forbidden:
             logger.warning(f"Не удалось отправить пользователю {user}")
             users_to_remove.append(user)
@@ -368,7 +370,9 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def webhook_handler(request, application):
     """Обработчик Webhook-запросов."""
     try:
-        update = Update.de_json(await request.json(), application.bot)
+        data = await request.json()
+        logger.info(f"Received webhook update: {data}")
+        update = Update.de_json(data, application.bot)
         if update:
             await application.process_update(update)
         return web.Response(status=200)
@@ -397,7 +401,7 @@ async def main():
         app.router.add_post('/webhook', lambda request: webhook_handler(request, application))
         runner = web.AppRunner(app)
         await runner.setup()
-        port = int(os.getenv("PORT", 10000))  # Render задаёт PORT, по умолчанию 10000
+        port = int(os.getenv("PORT", 10000))
         site = web.TCPSite(runner, '0.0.0.0', port)
         await site.start()
         logger.info(f"HTTP server started on port {port}")
