@@ -101,7 +101,7 @@ def get_inline_keyboard(user_id=None):
                 InlineKeyboardButton("🗑 Удалить группу", callback_data='remove_group')
             ],
             [
-                InlineKeyboardButton("🗑 Удалить пользователя", callback_dаta='remove_user'),
+                InlineKeyboardButton("🗑 Удалить пользователя", callback_data='remove_user'),
                 InlineKeyboardButton("🔄 Обновить меню", callback_data='refresh_menu')
             ]
         ]
@@ -133,26 +133,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик нажатий инлайн-кнопок меню."""
-    query = update.callback_query
-    if query.message.chat.type != 'private':
-        await query.answer()
-        return
-    await query.answer()
-    user_id = query.from_user.id
-    data = query.data
-    logger.info(f"Пользователь {user_id} нажал кнопку {data}")
-
-    if data == 'list_groups':
-        groups = load_groups()
-        if groups:
-            group_list = '\n'.join(f'🔹 {gid}' for gid in groups)
-            await query.message.reply_text(
-                f'📋 *Список групп\\:* \n{escape_markdown_v2(group_list)}',
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-        else:
-            await query.button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик нажатий инлайн-кнопок меню."""
     query = update.callback_query
     if query.message.chat.type != 'private':
