@@ -126,8 +126,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN_V2,
                                     reply_markup=get_inline_keyboard(user_id=user.id))
-    await update.message.reply_text(r'🔽 *Главное меню\\:*', parse_mode=ParseMode.MARKDOWN_V2,
-                                    reply_markup=get_main_menu())
+    await update.message.reply_text(
+        escape_markdown_v2("🔽 Главное меню:"),
+        parse_mode=ParseMode.MARKDOWN_V2,
+        reply_markup=get_main_menu()
+    )
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик нажатий инлайн-кнопок меню."""
@@ -144,49 +147,76 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         groups = load_groups()
         if groups:
             group_list = '\n'.join(f'🔹 {gid}' for gid in groups)
-            await query.message.reply_text(f'📋 *Список групп\\:* \n{escape_markdown_v2(group_list)}',
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+            await query.message.reply_text(
+                f'📋 *Список групп\\:* \n{escape_markdown_v2(group_list)}',
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
         else:
-            await query.message.reply_text(r'📭 *Список групп пуст\\.*', parse_mode=ParseMode.MARKDOWN_V2)
+            await query.message.reply_text(
+                escape_markdown_v2("📭 Список групп пуст."),
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
 
     elif data == 'list_users':
         users = load_users()
         if users:
             user_list = '\n'.join(f'🔹 {uid}' for uid in users)
-            await query.message.reply_text(f'👥 *Список пользователей\\:* \n{escape_markdown_v2(user_list)}',
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+            await query.message.reply_text(
+                f'👥 *Список пользователей\\:* \n{escape_markdown_v2(user_list)}',
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
         else:
-            await query.message.reply_text(r'📭 *Список пользователей пуст\\.*', parse_mode=ParseMode.MARKDOWN_V2)
+            await query.message.reply_text(
+                escape_markdown_v2("📭 Список пользователей пуст."),
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
 
     elif data == 'add_entity':
         if user_id != ADMIN_ID:
-            await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\\.*',
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+            await query.message.reply_text(
+                escape_markdown_v2("🚫 Только администратор может выполнять эту команду."),
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
-        add_text = r'➕ *Что добавить\\?*\n1️⃣ ID группы \\(отрицательное число\\)\n2️⃣ ID пользователя \\(положительное число\\)'
-        await query.message.reply_text(escape_markdown_v2(add_text),
-                                      parse_mode=ParseMode.MARKDOWN_V2)
+        add_text = "➕ Что добавить?\n1️⃣ ID группы (отрицательное число)\n2️⃣ ID пользователя (положительное число)"
+        await query.message.reply_text(
+            escape_markdown_v2(add_text),
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
         context.user_data['awaiting_entity_id'] = 'add'
 
     elif data == 'remove_group':
         if user_id != ADMIN_ID:
-            await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\\.*',
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+            await query.message.reply_text(
+                escape_markdown_v2("🚫 Только администратор может выполнять эту команду."),
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
-        await query.message.reply_text(r'🗑 *Введите ID группы для удаления\\:*', parse_mode=ParseMode.MARKDOWN_V2)
+        await query.message.reply_text(
+            escape_markdown_v2("🗑 Введите ID группы для удаления:"),
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
         context.user_data['awaiting_entity_id'] = 'remove_group'
 
     elif data == 'remove_user':
         if user_id != ADMIN_ID:
-            await query.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\\.*',
-                                          parse_mode=ParseMode.MARKDOWN_V2)
+            await query.message.reply_text(
+                escape_markdown_v2("🚫 Только администратор может выполнять эту команду."),
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
-        await query.message.reply_text(r'🗑 *Введите ID пользователя для удаления\\:*', parse_mode=ParseMode.MARKDOWN_V2)
+        await query.message.reply_text(
+            escape_markdown_v2("🗑 Введите ID пользователя для удаления:"),
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
         context.user_data['awaiting_entity_id'] = 'remove_user'
 
     elif data == 'refresh_menu':
-        await query.message.reply_text(r'🔄 *Меню обновлено\\:*', parse_mode=ParseMode.MARKDOWN_V2,
-                                      reply_markup=get_inline_keyboard(user_id=user_id))
+        await query.message.reply_text(
+            escape_markdown_v2("🔄 Меню обновлено:"),
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=get_inline_keyboard(user_id=user_id)
+        )
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик текстовых сообщений и медиа в личном чате."""
@@ -195,23 +225,44 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     logger.info(f"Получено сообщение от пользователя {user_id}")
 
+    # Проверка авторизации пользователя в самом начале
+    if user_id != ADMIN_ID:
+        authorized_users = load_users()
+        if user_id not in authorized_users:
+            await update.message.reply_text(
+                escape_markdown_v2("🚫 У вас нет прав на отправку рассылки."),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=get_inline_keyboard(user_id=user_id)
+            )
+            return
+
+    # Обработка текстового сообщения
     if text := update.message.text:
         logger.info(f"Текст: {text}")
         if text == '✨ Показать меню':
-            await update.message.reply_text(r'✨ *Меню\\:*', parse_mode=ParseMode.MARKDOWN_V2,
-                                           reply_markup=get_inline_keyboard(user_id=user_id))
+            await update.message.reply_text(
+                escape_markdown_v2("✨ Меню:"),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=get_inline_keyboard(user_id=user_id)
+            )
             return
 
+        # Обработка ввода ID для админ-действий
         if context.user_data.get('awaiting_entity_id'):
             if user_id != ADMIN_ID:
-                await update.message.reply_text(r'🚫 *Только администратор может выполнять эту команду\\.*',
-                                               parse_mode=ParseMode.MARKDOWN_V2)
+                await update.message.reply_text(
+                    escape_markdown_v2("🚫 Только администратор может выполнять эту команду."),
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
                 context.user_data.clear()
                 return
             try:
                 entity_id = int(text.strip())
             except ValueError:
-                await update.message.reply_text(r'❌ *ID должен быть числом\\.*', parse_mode=ParseMode.MARKDOWN_V2)
+                await update.message.reply_text(
+                    escape_markdown_v2("❌ ID должен быть числом."),
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
                 return
 
             action = context.user_data.get('awaiting_entity_id')
@@ -223,54 +274,66 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if entity_id not in groups:
                         groups.append(entity_id)
                         save_groups(groups)
-                        await update.message.reply_text(f'✅ *Группа {entity_id} добавлена\\.*',
-                                                       parse_mode=ParseMode.MARKDOWN_V2)
+                        await update.message.reply_text(
+                            escape_markdown_v2(f"✅ Группа {entity_id} добавлена."),
+                            parse_mode=ParseMode.MARKDOWN_V2
+                        )
                     else:
-                        await update.message.reply_text(f'⚠️ *Группа {entity_id} уже есть в списке\\.*',
-                                                       parse_mode=ParseMode.MARKDOWN_V2)
+                        await update.message.reply_text(
+                            escape_markdown_v2(f"⚠️ Группа {entity_id} уже есть в списке."),
+                            parse_mode=ParseMode.MARKDOWN_V2
+                        )
                 else:
                     if entity_id not in users:
                         users.append(entity_id)
                         save_users(users)
-                        await update.message.reply_text(f'✅ *Пользователь {entity_id} добавлен\\.*',
-                                                       parse_mode=ParseMode.MARKDOWN_V2)
+                        await update.message.reply_text(
+                            escape_markdown_v2(f"✅ Пользователь {entity_id} добавлен."),
+                            parse_mode=ParseMode.MARKDOWN_V2
+                        )
                     else:
-                        await update.message.reply_text(f'⚠️ *Пользователь {entity_id} уже есть в списке\\.*',
-                                                       parse_mode=ParseMode.MARKDOWN_V2)
+                        await update.message.reply_text(
+                            escape_markdown_v2(f"⚠️ Пользователь {entity_id} уже есть в списке."),
+                            parse_mode=ParseMode.MARKDOWN_V2
+                        )
 
             elif action == 'remove_group':
                 groups = load_groups()
                 if entity_id in groups:
                     groups.remove(entity_id)
                     save_groups(groups)
-                    await update.message.reply_text(f'🗑 *Группа {entity_id} удалена из списка\\.*',
-                                                   parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_text(
+                        escape_markdown_v2(f"🗑 Группа {entity_id} удалена из списка."),
+                        parse_mode=ParseMode.MARKDOWN_V2
+                    )
                 else:
-                    await update.message.reply_text(f'⚠️ *Группа {entity_id} не найдена в списке\\.*',
-                                                   parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_text(
+                        escape_markdown_v2(f"⚠️ Группа {entity_id} не найдена в списке."),
+                        parse_mode=ParseMode.MARKDOWN_V2
+                    )
 
             elif action == 'remove_user':
                 users = load_users()
                 if entity_id in users:
                     users.remove(entity_id)
                     save_users(users)
-                    await update.message.reply_text(f'🗑 *Пользователь {entity_id} удалён из списка\\.*',
-                                                   parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_text(
+                        escape_markdown_v2(f"🗑 Пользователь {entity_id} удалён из списка."),
+                        parse_mode=ParseMode.MARKDOWN_V2
+                    )
                 else:
-                    await update.message.reply_text(f'⚠️ *Пользователь {entity_id} не найден в списке\\.*',
-                                                   parse_mode=ParseMode.MARKDOWN_V2)
-            await update.message.reply_text(r'✨ *Меню\\:*', parse_mode=ParseMode.MARKDOWN_V2,
-                                           reply_markup=get_inline_keyboard(user_id=user_id))
+                    await update.message.reply_text(
+                        escape_markdown_v2(f"⚠️ Пользователь {entity_id} не найден в списке."),
+                        parse_mode=ParseMode.MARKDOWN_V2
+                    )
+            await update.message.reply_text(
+                escape_markdown_v2("✨ Меню:"),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=get_inline_keyboard(user_id=user_id)
+            )
             return
 
-        if user_id != ADMIN_ID:
-            authorized_users = load_users()
-            if user_id not in authorized_users:
-                await update.message.reply_text(r'🚫 *У вас нет прав на отправку рассылки\\.*',
-                                               parse_mode=ParseMode.MARKDOWN_V2)
-                return
-
-        # Обработка текста
+        # Обработка текста для рассылки
         content = escape_markdown_v2(text) if any(c in text for c in r'_*[]()~`>#+-=|{}.!,:') else text
         content_type = 'text'
     else:
@@ -288,10 +351,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             content = update.message.sticker
             content_type = 'sticker'
         else:
-            await update.message.reply_text(r'❌ *Поддерживаются только текст\\, фото\\, видео и стикеры\\.*',
-                                           parse_mode=ParseMode.MARKDOWN_V2)
+            await update.message.reply_text(
+                escape_markdown_v2("❌ Поддерживаются только текст, фото, видео и стикеры."),
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
 
+    # Рассылка контента в группы
     groups = load_groups()
     success_groups = 0
     groups_to_remove = []
@@ -343,9 +409,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             groups.remove(group_id)
         save_groups(groups)
 
-    response_text = f'✅ *Сообщение отправлено в {success_groups} из {len(groups)} групп\\.*'
+    response_text = f"✅ Сообщение отправлено в {success_groups} из {len(groups)} групп."
     await update.message.reply_text(
-        response_text,
+        escape_markdown_v2(response_text),
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=get_inline_keyboard(user_id=user_id)
     )
@@ -358,15 +424,15 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f'❌ *Ошибка\\:* `{escape_markdown_v2(str(context.error))}`',
             parse_mode=ParseMode.MARKDOWN_V2
         )
-    if ADMIN_ID:
-        try:
-            await context.bot.send_message(
-                chat_id=ADMIN_ID,
-                text=f'❌ *Ошибка бота\\:* `{escape_markdown_v2(str(context.error))}`',
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-        except Exception as e:
-            logger.error(f"Не удалось отправить уведомление об ошибке администратору: {e}")
+    if نشود
+    try:
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=f'❌ *Ошибка бота\\:* `{escape_markdown_v2(str(context.error))}`',
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+    except Exception as e:
+        logger.error(f"Не удалось отправить уведомление об ошибке администратору: {e}")
 
 async def webhook_handler(request, application):
     """Обработчик Webhook-запросов."""
