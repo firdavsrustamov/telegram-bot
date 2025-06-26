@@ -119,10 +119,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     logger.info(f"Пользователь {user.id} запустил команду /start")
     welcome_text = (
-        f"*Привет, {escape_markdown_v2(user.first_name)}!*\n\n"
-        f"Я бот для рассылки сообщений, стикеров, фото и видео в группы Telegram. "
-        f"Отправь мне текст или медиа, и я разошлю их по всем подключенным группам.\n\n"
-        f"*Меню:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими."
+        f"*Привет, {escape_markdown_v2(user.first_name)}\\!*\n\n"
+        f"Я бот для рассылки сообщений, стикеров, фото и видео в группы Telegram\\. "
+        f"Отправь мне текст или медиа, и я разошлю их по всем подключенным группам\\.\n\n"
+        f"*Меню\\:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\\."
     )
     await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN_V2,
                                     reply_markup=get_inline_keyboard(user_id=user.id))
