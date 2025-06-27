@@ -120,7 +120,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Пользователь {user.id} запустил команду /start")
     welcome_text = (
         f"*Привет, {escape_markdown_v2(user.first_name)}\\!*\n\n"
-        f"Я бот для рассылки сообщений, стикеров, фото и видео в группы Telegram\\. "
+        f"Я бот для рассылки сообщений, стикеров, фото, видео и GIF в группы Telegram\\. "
         f"Отправь мне текст или медиа, и я разошлю их по всем подключенным группам\\.\n\n"
         f"*Меню\\:* Вы можете посмотреть список групп или пользователей, а администратор – управлять ими\\."
     )
@@ -337,7 +337,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         content = escape_markdown_v2(text) if any(c in text for c in r'_*[]()~`>#+-=|{}.!,:') else text
         content_type = 'text'
     else:
-        # Обработка медиа (фото, видео, стикеры)
+        # Обработка медиа (фото, видео, стикеры, GIF)
         if update.message.photo:
             logger.info(f"Фото от пользователя {user_id}")
             content = update.message.photo[-1]  # Берем фото с наилучшим качеством
@@ -350,9 +350,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"Стикер от пользователя {user_id}")
             content = update.message.sticker
             content_type = 'sticker'
+        elif update.message.animation:
+            logger.info(f"GIF от пользователя {user_id}")
+            content = update.message.animation
+            content_type = 'animation'
         else:
             await update.message.reply_text(
-                escape_markdown_v2("❌ Поддерживаются только текст, фото, видео и стикеры."),
+                escape_markdown_v2("❌ Поддерживаются только текст, фото, видео, стикеры и GIF."),
                 parse_mode=ParseMode.MARKDOWN_V2
             )
             return
@@ -372,6 +376,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_video(chat_id=group_id, video=content.file_id)
             elif content_type == 'sticker':
                 await context.bot.send_sticker(chat_id=group_id, sticker=content.file_id)
+            elif content_type == 'animation':
+                await context.bot.send_animation(chat_id=group_id, animation=content.file_id)
             success_groups += 1
             logger.info(f"Контент ({content_type}) отправлен в группу {group_id}")
             await asyncio.sleep(0.3)  # Защита от лимитов Telegram
@@ -396,6 +402,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_video(chat_id=group_id, video=content.file_id)
                 elif content_type == 'sticker':
                     await context.bot.send_sticker(chat_id=group_id, sticker=content.file_id)
+                elif content_type == 'animation':
+                    await context.bot.send_animation(chat_id=group_id, animation=content.file_id)
                 success_groups += 1
             except Exception as retry_e:
                 logger.error(f"Повторная ошибка отправки в группу {group_id}: {retry_e}")
